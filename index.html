@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortoBots - Farcaster Portfolio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>PortoBots</h1>
+        <p>Masukkan FID Farcaster kamu untuk lihat portfolio:</p>
+        <input type="number" id="fidInput" placeholder="Contoh: 1234" min="1">
+        <button onclick="fetchPortfolio()">Load Portfolio</button>
+        
+        <div id="loading" style="display:none;">Loading...</div>
+        
+        <div id="portfolio" style="display:none;">
+            <h2>Nilai Keseluruhan Wallet: $<span id="totalValue">0</span> USDC</h2>
+            
+            <h3>5 Token Teratas</h3>
+            <ul id="topTokens"></ul>
+            
+            <h3>Saldo LP</h3>
+            <p id="lpBalance">$0 (Estimasi dari pool utama)</p>
+            
+            <h3>Saldo Staking</h3>
+            <p id="stakingBalance">$0 (Estimasi ETH staked)</p>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
