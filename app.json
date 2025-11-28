@@ -1,0 +1,13 @@
+{
+  "name": "PortoBots",
+  "description": "Cek isi dompet EVM kamu: total value, 5 token teratas, LP & staking",
+  "iconUrl": "https://portobots-mini.vercel.app/icon.png",
+  "homepageUrl": "https://portobots-mini.vercel.app",
+  "miniAppUrl": "https://portobots-mini.vercel.app",
+  "version": "1.0.0",
+  "author": {
+    "name": "Anon"
+  },
+  "categories": ["utilities", "defi"],
+  "supportedChains": ["ethereum", "base", "optimism", "arbitrum", "zora", "polygon"]
+}
