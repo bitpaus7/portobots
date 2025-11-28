@@ -1,33 +1,110 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortoBots - Farcaster Portfolio</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PortoBots - Cek Dompet EVM</title>
+  <style>
+    body{font-family:system-ui;background:#000;color:#fff;margin:0;padding:20px;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .box{max-width:380px;width:100%;background:#111;padding:24px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+    h1{font-size:28px;margin:0 0 8px;text-align:center}
+    input,button{width:100%;padding:14px;margin:10px 0;border:none;border-radius:12px;font-size:16px;box-sizing:border-box}
+    input{background:#222;color:#fff}
+    button{background:#8b5cf6;color:#fff;font-weight:bold;cursor:pointer}
+    #loading{display:none;margin:20px 0;color:#8b5cf6;text-align:center}
+    #result{display:none;background:#1a1a1a;padding:16px;border-radius:12px;margin-top:15px}
+    ul{list-style:none;padding:0;margin:10px 0}
+    li{background:#222;padding:10px;margin:6px 0;border-radius:8px}
+    small{opacity:0.6;display:block;margin-top:12px;font-size:12px}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>PortoBots</h1>
-        <p>Masukkan FID Farcaster kamu untuk lihat portfolio:</p>
-        <input type="number" id="fidInput" placeholder="Contoh: 1234" min="1">
-        <button onclick="fetchPortfolio()">Load Portfolio</button>
-        
-        <div id="loading" style="display:none;">Loading...</div>
-        
-        <div id="portfolio" style="display:none;">
-            <h2>Nilai Keseluruhan Wallet: $<span id="totalValue">0</span> USDC</h2>
-            
-            <h3>5 Token Teratas</h3>
-            <ul id="topTokens"></ul>
-            
-            <h3>Saldo LP</h3>
-            <p id="lpBalance">$0 (Estimasi dari pool utama)</p>
-            
-            <h3>Saldo Staking</h3>
-            <p id="stakingBalance">$0 (Estimasi ETH staked)</p>
-        </div>
-    </div>
-    <script src="script.js"></script>
+  <div class="box">
+    <h1>PortoBots</h1>
+    <p style="text-align:center;margin:4px 0 16px;font-size:14px">Cek isi dompet EVM (ETH, Base, Arb, dll)</p>
+    <input type="text" id="addr" placeholder="0x..." autocomplete="off">
+    <button onclick="cek()">Cek Dompet</button>
+    <div id="loading">Sedang mengambil data...</div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // === MORALIS API KEY KAMU (40k compute units/hari) ===
+    const MORALIS_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjA2OTE5MmFmLTAxNzctNDBkYi04NjQwLTYzN2I0ZjJmNmNlMSIsIm9yZ0lkIjoiNDgzNjY0IiwidXNlcklkIjoiNDk3NjAzIiwidHlwZUlkIjoiYzU3ZjA0YTktNDM4Ni00MDQ5LWFhMGUtOWVmNTBmMmJlNWExIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NjQzNzAyMzMsImV4cCI6NDkyMDEzMDIzM30.0kda5g8LQ3pI9SHBOaRK8dWkJSsELOWwQlojPEJDP_o";
+
+    const headers = { "x-api-key": MORALIS_API_KEY, "accept": "application/json" };
+
+    // Auto-load kalau ada ?address= di URL
+    const params = new URLSearchParams(location.search);
+    const auto = params.get("address") || params.get("addr");
+    if (auto && auto.startsWith("0x")) {
+      document.getElementById("addr").value = auto;
+      cek();
+    }
+
+    async function cek() {
+      let addr = document.getElementById("addr").value.trim();
+      if (!addr) return alert("Masukkan address 0x dulu!");
+      if (!addr.startsWith("0x")) addr = "0x" + addr;
+      addr = addr.toLowerCase();
+
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("result").style.display = "none";
+
+      try {
+        // 1. Total net worth
+        const net = await fetch(`https://deep-index.moralis.io/api/v2.2/wallets/${addr}/net-worth`, { headers }).then(r => r.json());
+
+        // 2. Token balances (dengan USD value)
+        const tokens = await fetch(`https://deep-index.moralis.io/api/v2.2/wallets/${addr}/tokens?exclude_spam=true&exclude_unverified=true`, { headers }).then(r => r.json());
+
+        // 3. DeFi positions (LP + staking)
+        const defi = await fetch(`https://deep-index.moralis.io/api/v2.2/wallets/${addr}/defi/positions`, { headers }).then(r => r.json());
+
+        const totalValue = net.total_networth_usd || 0;
+
+        // Top 5 token
+        const top5 = (tokens.result || [])
+          .filter(t => t.usd_value > 1) // minimal $1 biar gak spam
+          .sort((a,b) => b.usd_value - a.usd_value)
+          .slice(0,5);
+
+        // Hitung LP & staking dari defi positions
+        let lp = 0, staking = 0;
+        (defi || []).forEach(pos => {
+          const val = pos.usd_value || 0;
+          if (pos.position_type === "liquidity" || pos.protocol_name.toLowerCase().includes("uniswap") || pos.protocol_name.toLowerCase().includes("curve") || pos.protocol_name.toLowerCase().includes("sushi")) {
+            lp += val;
+          }
+          if (pos.position_type === "stake" || pos.protocol_name.toLowerCase().includes("lido") || pos.protocol_name.toLowerCase().includes("rocket") || pos.protocol_name.toLowerCase().includes("stakewise")) {
+            staking += val;
+          }
+        });
+
+        // Tampilkan hasil
+        let html = `<h2>Total: $${Number(totalValue).toLocaleString("en-US", {maximumFractionDigits: 0})}</h2>`;
+        html += `<p>LP ≈ $${lp.toFixed(0)} | Staking ≈ $${staking.toFixed(0)}</p>`;
+        html += `<h3 style="margin:12px 0 6px">5 Token Teratas</h3><ul>`;
+        top5.forEach(t => {
+          html += `<li><strong>${t.symbol}</strong>: ${Number(t.balance_formatted).toFixed(4)} ($${t.usd_value.toFixed(0)})</li>`;
+        });
+        html += `</ul><small>Powered by Moralis • 40k compute units/hari</small>`;
+
+        document.getElementById("result").innerHTML = html;
+        document.getElementById("result").style.display = "block";
+
+        // Update URL biar bisa di-share
+        history.replaceState(null, null, `?address=${addr}`);
+      } catch (e) {
+        console.error(e);
+        alert("Gagal ambil data. Coba lagi 5 detik kemudian (rate limit atau address salah).");
+      }
+
+      document.getElementById("loading").style.display = "none";
+    }
+
+    // Enter key support
+    document.getElementById("addr").addEventListener("keypress", e => { if (e.key === "Enter") cek(); });
+  </script>
 </body>
 </html>
